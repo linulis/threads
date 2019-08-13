@@ -1,4 +1,4 @@
-q#include <pthread.h>
+#include <pthread.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +19,8 @@ struct thread_info {    /* Used as argument to thread_start() */
     char     *argv_string;      /* From command-line argument */
     int 	  timeout;
     long int  time_ss;
+	struct timespec time_now_ns;
+
 };
 
 static void handle_error_en(int error_code, char *message)
@@ -37,9 +39,9 @@ static void * thread_start(void *arg)
 {
 	struct thread_info *tinfo = arg;
     char *uargv, *p;
-	struct timespec ts;
+	struct timespec ts, time_now_ns;
 
-	printf("Thread %d (%s). Top of stack near %p. Task wait time %d.\n", tinfo->thread_num, tinfo->argv_string, &p, tinfo->timeout);
+	printf("Thread %d (%s). Top of stack near %p. Task wait time %d ms.\n", tinfo->thread_num, tinfo->argv_string, &p, tinfo->timeout);
 
     uargv = strdup(tinfo->argv_string);
     if (uargv == NULL)
@@ -53,14 +55,35 @@ static void * thread_start(void *arg)
 
     while(1)
     {
-    	long int time_now = time(NULL);
+//    	long int time_now = time(NULL );
+
+    	clock_gettime(CLOCK_REALTIME, &time_now_ns);
+
+    	long int nsec_diff = time_now_ns.tv_nsec - tinfo->time_now_ns.tv_nsec;
+    	long int sec_diff = time_now_ns.tv_sec - tinfo->time_now_ns.tv_sec;
+    	long int ms_diff;
+    	double proc;
+
+    	if (nsec_diff < 0)
+    	{
+    		sec_diff--;
+    		nsec_diff =+ 1000000000L;
+    	}
+
+    	ms_diff = sec_diff * 1000 + nsec_diff / 1000;
 
 
-    	printf("Thread %d (%s). Task wait time %d. Time diff %ld\n", tinfo->thread_num, tinfo->argv_string, tinfo->timeout, time_now - tinfo->time_ss ) ;
-    	tinfo->time_ss = time_now;
+    	proc = (  ((double) ms_diff - (double) tinfo->timeout) / ((double)tinfo->timeout) ) * 100;
 
-    	ts.tv_sec = tinfo->timeout;
-    	ts.tv_nsec = 0;
+
+    	printf("Thread %d (%s). Task wait time %d ms. Time diff %ld. %.1f%%\n", tinfo->thread_num, tinfo->argv_string, tinfo->timeout, ms_diff, proc) ;
+
+    	tinfo->time_now_ns.tv_sec = time_now_ns.tv_sec;
+    	tinfo->time_now_ns.tv_nsec = time_now_ns.tv_nsec;
+
+
+    	ts.tv_sec = tinfo->timeout / 1000;
+    	ts.tv_nsec = (tinfo->timeout % 1000) * 1000;
 
     	nanosleep(&ts, NULL);
     }
@@ -124,6 +147,7 @@ int main(int argc, char *argv[])
         s = pthread_create(&tinfo[tnum].thread_id, &attr, &thread_start, &tinfo[tnum]);
    		handle_error_en(s, "pthread_create");
 	}
+
 
      /* Destroy the thread attributes object, since it is no
      longer needed */
