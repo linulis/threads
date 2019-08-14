@@ -67,7 +67,7 @@ static void * thread_start(void *arg)
     	if (nsec_diff < 0)
     	{
     		sec_diff--;
-    		nsec_diff =+ 1000000000L;
+    		nsec_diff += 1000000000L;
     	}
 
     	ms_diff = sec_diff * 1000 + nsec_diff / 1000;
