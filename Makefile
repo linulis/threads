@@ -5,7 +5,7 @@ threads: main.c $(INC_DIR)/
 
 
 mmap: mmap.c $(INC_DIR)/
-	gcc mmap.c -I$(INC_DIR) -o mmap.o
+	gcc mmap.c bibl.c -I$(INC_DIR) -o mmap.out
 
 all: threads
 
