@@ -1,70 +1,82 @@
-       #include <sys/mman.h>
-       #include <sys/stat.h>
-       #include <fcntl.h>
-       #include <stdio.h>
-       #include <stdlib.h>
-       #include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-       #define handle_error(msg) \
-           do { perror(msg); exit(EXIT_FAILURE); } while (0)
+#define handle_error_(msg) \
+		do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
-       int
-       main(int argc, char *argv[])
-       {
-           char *addr;
-           int fd;
-           struct stat sb;
-           off_t offset, pa_offset;
-           size_t length;
-           ssize_t s;
+static void handle_error(int error_code, char *message)
+{
+	if (error_code == -1)
+	{
+		handle_error_(message);
+	}
+}
 
-           if (argc < 3 || argc > 4) {
-               fprintf(stderr, "%s file offset [length]\n", argv[0]);
-               exit(EXIT_FAILURE);
-           }
 
-           fd = open(argv[1], O_RDONLY);
-           if (fd == -1)
-               handle_error("open");
+int	main(int argc, char *argv[])
+{
+	char *addr;
+	int fd;
+	struct stat sb;
+	off_t offset, pa_offset;
+	size_t length;
+	ssize_t s;
 
-           if (fstat(fd, &sb) == -1)           /* To obtain file size */
-               handle_error("fstat");
+	if (argc < 3 || argc > 4)
+	{
+		fprintf(stderr, "%s file offset [length]\n", argv[0]);
+		exit(EXIT_FAILURE);
+	}
 
-           offset = atoi(argv[2]);
-           pa_offset = offset & ~(sysconf(_SC_PAGE_SIZE) - 1);
-               /* offset for mmap() must be page aligned */
+	fd = open(argv[1], O_RDONLY);
+	handle_error(fd, "open");
 
-           if (offset >= sb.st_size) {
-               fprintf(stderr, "offset is past end of file\n");
-               exit(EXIT_FAILURE);
-           }
+	handle_error(fstat(fd, &sb),"fstat"); /* To obtain file size */
 
-           if (argc == 4) {
-               length = atoi(argv[3]);
-               if (offset + length > sb.st_size)
-                   length = sb.st_size - offset;
-                       /* Can't display bytes past end of file */
+	offset = atoi(argv[2]);
+	pa_offset = offset & ~(sysconf(_SC_PAGE_SIZE) - 1);
+	/* offset for mmap() must be page aligned */
 
-           } else {    /* No length arg ==> display to end of file */
-               length = sb.st_size - offset;
-           }
+	if (offset >= sb.st_size)
+	{
+		fprintf(stderr, "offset is past end of file\n");
+		exit(EXIT_FAILURE);
+	}
 
-           addr = mmap(NULL, length + offset - pa_offset, PROT_READ,
-                       MAP_PRIVATE, fd, pa_offset);
-           if (addr == MAP_FAILED)
-               handle_error("mmap");
+    if (argc == 4)
+    {
+    	length = atoi(argv[3]);
+        if (offset + length > sb.st_size)
+        {
+        	length = sb.st_size - offset;	/* Can't display bytes past end of file */
+        }
+        else
+        {
+        	length = sb.st_size - offset;  /* No length arg ==> display to end of file */
+        }
 
-           s = write(STDOUT_FILENO, addr + offset - pa_offset, length);
-           if (s != length) {
-               if (s == -1)
-                   handle_error("write");
+        addr = mmap(NULL, length + offset - pa_offset, PROT_READ, MAP_PRIVATE, fd, pa_offset);
 
-               fprintf(stderr, "partial write");
-               exit(EXIT_FAILURE);
-           }
+        if (addr == MAP_FAILED)
+        {
+        	handle_error_("mmap");
+        }
 
-           munmap(addr, length + offset - pa_offset);
-           close(fd);
+        s = write(STDOUT_FILENO, addr + offset - pa_offset, length);
+        if (s != length)
+        {
+        	handle_error(s, "write");
+        	fprintf(stderr, "partial write");
+            exit(EXIT_FAILURE);
+        }
 
-           exit(EXIT_SUCCESS);
-       }
+        munmap(addr, length + offset - pa_offset);
+        close(fd);
+
+        exit(EXIT_SUCCESS);
+    }
+}
