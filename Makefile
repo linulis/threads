@@ -1,4 +1,4 @@
-INC_DIR=/home/vasilil/src/threads
+INC_DIR=
 
 threads: main.c $(INC_DIR)/
 	gcc main.c -I$(INC_DIR) -lpthread -o threads.o
